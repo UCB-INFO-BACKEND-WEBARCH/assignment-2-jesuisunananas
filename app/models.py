@@ -10,10 +10,10 @@ class TaskModel(db.Model):
     title = db.Column(db.String(100), nullable=False)
     description = db.Column(db.String(500))
     completed = db.Column(db.Boolean, default=False)
-    due_date = db.Column(db.DateTime)
+    due_date = db.Column(db.DateTime(timezone=True))
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'))
-    created_at = db.Column(db.DateTime, default=datetime.datetime.now)
-    updated_at = db.Column(db.DateTime, onupdate=datetime.datetime.now)
+    created_at = db.Column(db.DateTime(timezone=True), default=datetime.datetime.now)
+    updated_at = db.Column(db.DateTime(timezone=True), onupdate=datetime.datetime.now)
 
 
 class CategoryModel(db.Model):

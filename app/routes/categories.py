@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
-from models import db, TaskModel, CategoryModel
-from schemas import CategorySchema, TaskSchema
+from app.models import db, TaskModel, CategoryModel
+from app.schemas import CategorySchema, TaskSchema
 from marshmallow import ValidationError
 
 categories_blp = Blueprint('categories', __name__)
@@ -25,7 +25,7 @@ def get_category(category_id):
     if not category:
         return jsonify({"error": "Category not found"}), 404
     category_schema = CategorySchema()
-    task_schema = TaskSchema()
+    task_schema = TaskSchema(only=("id", "title", "completed"))
     tasks = TaskModel.query.filter_by(category_id=category.id).all()
     all_tasks = []
     category_dict = category_schema.dump(category)
@@ -60,7 +60,7 @@ def create_category():
 
 @categories_blp.route('/categories/<int:category_id>', methods=["DELETE"])
 def delete_category(category_id):
-    category = CategoryModel.query.get_or_404(category_id)
+    category = CategoryModel.query.get(category_id)
     if not category:
         return jsonify({'error': 'Category not found'}), 404
     count = TaskModel.query.filter_by(category_id = category.id).count()

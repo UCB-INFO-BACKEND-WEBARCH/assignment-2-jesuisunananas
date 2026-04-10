@@ -1,7 +1,12 @@
 from flask import Blueprint, jsonify, request
-from models import db, TaskModel, CategoryModel
-from schemas import TaskSchema
+from app.models import db, TaskModel, CategoryModel
+from app.schemas import TaskSchema
 from marshmallow import ValidationError
+from datetime import datetime, timedelta, timezone
+import os
+from redis import Redis
+from rq import Queue
+from app.jobs import send_notification
 
 tasks_blp = Blueprint('tasks', __name__)
 
@@ -26,7 +31,7 @@ def get_tasks():
                 "name": category.name,
                 "color": category.color
             }
-    return jsonify(tasks_list), 200    
+    return {"tasks": tasks_list}, 200    
 
 @tasks_blp.route('/tasks/<int:task_id>', methods=['GET'])
 def get_task(task_id):
@@ -35,6 +40,14 @@ def get_task(task_id):
         return jsonify({"error": "Task not found"}), 404
     task_schema = TaskSchema()
     task_dict = task_schema.dump(task)
+    category_id = task_dict.get('category_id')
+    if category_id:
+        category = CategoryModel.query.get(category_id)
+        task_dict['category'] = {
+            "id": category.id,
+            "name": category.name,
+            "color": category.color
+        }
     return jsonify(task_dict), 200
 
 @tasks_blp.route('/tasks', methods=['POST'])
@@ -56,11 +69,20 @@ def create_task():
     db.session.add(new_task)
     db.session.commit()
 
+    notification_queued = False
+
+    if new_task.due_date:
+        now = datetime.now(timezone.utc)
+        if now < new_task.due_date <= now + timedelta(hours=24):
+            q = Queue(connection = Redis.from_url(os.getenv('REDIS_URL', 'redis://localhost:6379/0')))
+            q.enqueue("app.jobs.send_notification", new_task.title)
+            notification_queued = True
+
     result_task = task_schema.dump(new_task)
 
     return jsonify({
         "task": result_task,
-        "notification_queued": True
+        "notification_queued": notification_queued
     }), 201
 
 @tasks_blp.route('/tasks/<int:task_id>', methods=['PUT'])
